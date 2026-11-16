@@ -4,11 +4,15 @@ import { useState } from "react";
 import { TrainResult } from "@/lib/ml/engine";
 import { ModelChoice } from "@/lib/ml/lesson";
 import { Prepared } from "@/lib/ml/profile";
+import { Table } from "@/lib/ml/datasets";
 import CodeView from "./CodeView";
+import FitPlot from "./FitPlot";
 import LossChart from "./LossChart";
 import Tex from "../Tex";
 
 interface Props {
+  table: Table;
+  target: number;
   choice: ModelChoice;
   prepared: Prepared;
   code: string;
@@ -21,7 +25,7 @@ interface Props {
   onTry: () => void;
 }
 
-export default function StepFit({ choice, prepared, code, running, loss, result, rmse, onRun, onStop, onTry }: Props) {
+export default function StepFit({ table, target, choice, prepared, code, running, loss, result, rmse, onRun, onStop, onTry }: Props) {
   const [showCode, setShowCode] = useState(false);
   const d = prepared.d;
   const w3 = (v: number) => (Math.abs(v) < 0.0005 ? 0 : v).toFixed(3);
@@ -86,6 +90,8 @@ export default function StepFit({ choice, prepared, code, running, loss, result,
           {showCode ? "Hide" : "Show"} PyTorch code
         </button>
       </div>
+
+      <FitPlot table={table} target={target} terms={choice.terms} prepared={prepared} theta={result && !result.diverged ? result.theta : null} />
 
       {showCode && <div className="mb-4"><CodeView code={code} /></div>}
 

@@ -126,9 +126,11 @@ export default function BuilderPage() {
   if (step === 0) body = <StepData table={table} note={note} review={review} onTable={loadTable} onReview={applyReview} />;
   else if (step === 1 && table) body = <StepVariables table={table} target={target} feats={feats} review={review} onTarget={changeTarget} onFeats={setFeats} />;
   else if (step === 2 && table && choice) body = <StepExplore table={table} target={target} feats={feats} r2Linear={choice.r2Linear} />;
-  else if (step === 3 && prepared && choice)
+  else if (step === 3 && table && prepared && choice)
     body = (
       <StepFit
+        table={table}
+        target={target}
         choice={choice}
         prepared={prepared}
         code={code}
