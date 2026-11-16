@@ -21,14 +21,14 @@ import {
   zScaleFor,
 } from "@/lib/calculusMath";
 import { KIND_LABEL, canonicalLatex, levelLatex, traceLatex } from "@/lib/equations";
-import { KINDS, Kind, STORIES, lossCoefficients, standardForm, standardTrace } from "@/lib/explorer";
+import { KINDS, Kind, ML_MEANING, STORIES, lossCoefficients, standardForm, standardTrace } from "@/lib/explorer";
 import { traceQuadratic } from "@/lib/calculusMath";
 import { Slices } from "@/lib/types";
 
 const QuadricCanvas = dynamic(() => import("@/components/QuadricCanvas"), { ssr: false });
 const TraceBuildCanvas = dynamic(() => import("@/components/explorer/TraceBuildCanvas"), { ssr: false });
 
-const STEPS = ["Surface", "Equation", "Build", "Dataset", "Loss", "Point", "Traces", "Training", "Summary"];
+const STEPS = ["Surface", "Equation", "Build", "Dataset", "Loss", "Point", "Traces", "Training", "In ML", "Summary"];
 const T = String.raw;
 const f = (x: number, d = 3) => (Math.abs(x) < 0.5 * Math.pow(10, -d) ? 0 : x).toFixed(d);
 const NO_VECTORS = { normal: false, grad: false, momentum: false };
@@ -173,7 +173,7 @@ export default function ExplorerPage() {
     const ex = (mode: TraceMode) => standardTrace(kind!, mode, 1, std.a, std.b);
     body = (
       <div>
-        <H n={2}>The equation of a {story.name.toLowerCase()}</H>
+        <H n={2}>The equation of {/^[aeiou]/i.test(story.name) ? "an" : "a"} {story.name.toLowerCase()}</H>
         <P>
           In Stewart §12.6, a quadric surface is the graph of a second-degree equation in x, y and z. This one, in standard form, is:
         </P>
@@ -572,10 +572,54 @@ export default function ExplorerPage() {
         </p>
       </div>
     );
+  } else if (step === 8) {
+    const mm = ML_MEANING[kind!];
+    const mu1 = 2 * model.lam1;
+    const mu2 = 2 * model.lam2;
+    const kappa = mu2 > 1e-6 ? mu1 / mu2 : Infinity;
+    body = (
+      <div>
+        <H n={9}>What the {story.name.toLowerCase()} means in machine learning</H>
+        <p className="mb-2 text-xl font-bold">{mm.heading}</p>
+        <h3 className="mt-5 text-lg font-bold">Why the loss has this shape</h3>
+        {kind !== "saddle" && (
+          <Paper
+            lines={[T`L(w) &= \frac{1}{N}\lVert y-Xw\rVert^2`, T`H &= \nabla^2L = \frac{2}{N}X^{\top}X = 2\,\Sigma`]}
+          />
+        )}
+        {mm.why.map((t) => (
+          <P key={t}>{t}</P>
+        ))}
+        <p className="my-2">
+          Condition on the Hessian eigenvalues: <Tex tex={mm.condition} />
+        </p>
+        {kind !== "saddle" ? (
+          <p className="mb-2 text-gray-700">
+            Here: μ₁ = {f(mu1)}, μ₂ = {f(mu2)}, so κ = μ₁/μ₂ {Number.isFinite(kappa) ? `= ${f(kappa, 2)}` : "is infinite"}.
+          </p>
+        ) : (
+          <p className="mb-2 text-gray-700">
+            Here: λ₁ = {f(model.lam1)} (curves down), λ₂ = {f(model.lam2)} (curves up). The signs differ.
+          </p>
+        )}
+        <h3 className="mt-5 text-lg font-bold">Where you meet it</h3>
+        <ul className="list-disc space-y-1 pl-6 text-[17px] leading-relaxed">
+          {mm.where.map((t) => (
+            <li key={t}>{t}</li>
+          ))}
+        </ul>
+        <h3 className="mt-5 text-lg font-bold">What it does to training</h3>
+        {mm.training.map((t) => (
+          <P key={t}>{t}</P>
+        ))}
+        <h3 className="mt-5 text-lg font-bold">What to do about it</h3>
+        <P>{mm.remedy}</P>
+      </div>
+    );
   } else {
     body = (
       <div>
-        <H n={9}>Summary: the {story.name.toLowerCase()}</H>
+        <H n={10}>Summary: the {story.name.toLowerCase()}</H>
         <ol className="list-decimal space-y-3 pl-6 text-[17px] leading-relaxed">
           <li>
             Standard form: <Tex tex={story.stewart} />. Its traces are {kind === "circular" ? "circles and parabolas" : kind === "elliptic" ? "ellipses and parabolas" : kind === "cylinder" ? "parallel lines and parabolas" : "hyperbolas and parabolas"}.

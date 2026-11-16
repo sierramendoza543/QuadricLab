@@ -167,3 +167,91 @@ export function lossCoefficients(m: Model) {
   }
   return { A: A / n, B: B / n, C: C / n, D: D / n, E: E / n, F: F / n };
 }
+
+// What each surface means in machine learning: where it comes from in the data and what it does to training.
+export interface MlMeaning {
+  heading: string;
+  condition: string; // TeX: the eigenvalue condition for this surface
+  why: string[];
+  where: string[];
+  training: string[];
+  remedy: string;
+}
+
+export const ML_MEANING: Record<Kind, MlMeaning> = {
+  circular: {
+    heading: "Predictors with equal spread and no correlation",
+    condition: String.raw`\mu_1=\mu_2>0`,
+    why: [
+      "The Hessian of the mean squared error is twice the covariance matrix of the predictors. Curvature of the loss in a direction equals the variance of the data in that direction.",
+      "If both predictors have the same variance and are uncorrelated, the covariance matrix is a multiple of the identity. Both eigenvalues are equal, so the loss curves the same amount in every direction and the level curves are circles.",
+    ],
+    where: [
+      "Predictors that were standardized (mean 0, variance 1) and that do not move together.",
+      "Whitened data, where a transformation such as PCA has removed the correlation.",
+    ],
+    training: [
+      "The condition number κ = μ₁/μ₂ is 1, the best case. The negative gradient points straight at the minimum from every starting point.",
+      "With the step size α = 1/μ, gradient descent lands on the minimum in one step.",
+    ],
+    remedy:
+      "This is the surface that standardizing and whitening try to produce. Preprocessing the inputs is an attempt to turn every other bowl on this list into this one.",
+  },
+  elliptic: {
+    heading: "Predictors with unequal spread or correlation",
+    condition: String.raw`\mu_1>\mu_2>0,\qquad \kappa=\mu_1/\mu_2>1`,
+    why: [
+      "Same rule as before: the Hessian is twice the covariance matrix, so the bowl takes the shape of the data cloud. When one predictor varies more than the other, the loss is steep along it and shallow along the other, and the level curves stretch into ellipses.",
+      "Correlated predictors do the same thing along a tilted axis. The cross term B in the loss is what rotates the ellipse away from the w₁, w₂ axes.",
+    ],
+    where: [
+      "Predictors on different scales, such as square feet (thousands) next to bedrooms (a few).",
+      "Predictors that move together, such as height and weight.",
+      "Near the end of training in a neural network, where the loss looks like an elongated bowl with very different curvatures in different directions.",
+    ],
+    training: [
+      "The step size is capped by the steepest direction (α < 2/μ₁ or the weights diverge), but progress along the shallowest direction is proportional to μ₂. A large κ means a small α and a very slow crawl, with the ball zig-zagging across the steep walls.",
+      "This is called ill-conditioning, and κ measures how bad it is.",
+    ],
+    remedy:
+      "Standardize the predictors to shrink κ. Optimizers like Adam and momentum also help by scaling or smoothing each direction's step.",
+  },
+  cylinder: {
+    heading: "Predictors that are linearly dependent",
+    condition: String.raw`\mu_1>0,\qquad \mu_2=0`,
+    why: [
+      "If one predictor is a linear function of the others, the columns of the data matrix are dependent and the covariance matrix has an eigenvalue of 0. The loss does not curve at all along that direction, so a flat trough runs through the bowl.",
+      "Every point on the trough has exactly the same loss. The minimum is a whole line of weights, not a single point, so the problem has no unique solution.",
+    ],
+    where: [
+      "The same quantity in two units, like temperature in °C and °F.",
+      "The dummy-variable trap: one 0/1 column for every category plus an intercept.",
+      "More predictors than rows of data.",
+    ],
+    training: [
+      "Gradient descent still converges, but only to one point on the trough, and which point depends on where it started. Two runs from different starts give different weights and identical predictions.",
+      "Individual weights stop meaning anything. Only the combination along the curved direction is determined by the data.",
+    ],
+    remedy:
+      "Drop the redundant column, or add ridge regularization. Ridge adds λ‖w‖² to the loss, which adds 2λ to every eigenvalue and turns the cylinder back into a bowl with one minimum.",
+  },
+  saddle: {
+    heading: "Two objectives pulling in opposite directions",
+    condition: String.raw`\text{Hessian eigenvalues of opposite sign: one }>0,\ \text{one }<0`,
+    why: [
+      "A mean squared error can never produce this surface. Its Hessian is a covariance matrix, which has no negative eigenvalues, so it can only curve upward.",
+      "A saddle needs a direction that curves down. That happens when one player is maximizing the same quantity the other is minimizing, as with the generator and discriminator in a GAN.",
+    ],
+    where: [
+      "Generative adversarial networks and other adversarial training.",
+      "Robust optimization, where one side picks the weights and the other picks the worst-case input.",
+      "Saddle points also appear in the loss of ordinary neural networks. In high dimensions they are far more common than local minima.",
+    ],
+    training: [
+      "Plain gradient descent slides off a saddle along the downward-curving direction. Gradient descent–ascent has each player move its own way, one descending and one ascending.",
+      "It can circle the saddle point instead of settling when the two weights are coupled strongly, which is why GAN training is hard to stabilize.",
+    ],
+    remedy:
+      "Use smaller step sizes, different step sizes for the two players, or methods built for games, such as extragradient and optimistic updates.",
+  },
+};
