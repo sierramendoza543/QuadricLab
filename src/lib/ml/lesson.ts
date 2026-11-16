@@ -1,6 +1,6 @@
-import { Net, Plan, TrainConfig, TrainResult } from "./engine";
+import { Net, Plan, Task, TrainConfig, TrainResult, logLoss, sigmoid } from "./engine";
 import { Prepared, Term } from "./profile";
-import { Table } from "./datasets";
+import { Table, classInfo } from "./datasets";
 import { Grid, QuadricFit, Slice, computeGrid, fitQuadric, weightSlice } from "./landscape";
 import { AiTermSpec, SearchResult, describeSearch, searchTerms } from "./search";
 
@@ -24,8 +24,8 @@ export function chooseModel(t: Table, target: number, feats: number[], ai: AiTer
     degree,
     terms: search.terms,
     r2Linear: search.r2Linear,
-    reason: describeSearch(search, t.columns[target]),
-    cfg: { optimizer: "adam", lr: 0.05, epochs: 400, seed: 3 },
+    reason: describeSearch(search, t.columns[target], classInfo(t, target)),
+    cfg: { optimizer: "adam", lr: 0.05, epochs: classInfo(t, target) ? 500 : 400, seed: 3 },
     search,
   };
 }
@@ -83,6 +83,7 @@ export interface PathPoint {
 }
 
 export interface SampleRow {
+  z: number; // the score before the sigmoid (classification)
   y: number;
   yhat: number;
   miss: number;
@@ -92,6 +93,8 @@ export interface SampleRow {
 }
 
 export interface Lesson {
+  task: Task;
+  hess: [number, number, number] | null; // exact second derivatives at the minimum, classification only
   n: number;
   names: [string, string];
   frozen: boolean;
@@ -117,6 +120,7 @@ export interface Lesson {
 }
 
 export interface MathBundle {
+  task: Task;
   slice: Slice;
   grid: Grid;
   fit: QuadricFit;
@@ -164,7 +168,8 @@ function subsample(data: Prepared, cap: number) {
 const ALPHAS = [0.5, 0.3, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005];
 
 export async function buildMath(plan: Plan, data: Prepared, result: TrainResult, cancelled: () => boolean, pairChoice: [number, number] | null = null): Promise<MathBundle | null> {
-  const net = new Net(plan);
+  const task = data.task;
+  const net = new Net(plan, task);
   const theta = result.theta;
   const { X, y, n } = subsample(data, 1500);
   const ranked = rankPairs(data, theta);
@@ -202,11 +207,15 @@ export async function buildMath(plan: Plan, data: Prepared, result: TrainResult,
   tmp[j] = start[1];
   const pred = Float64Array.from(net.forward(tmp, X, n));
   const input = (k: number, col: number) => (col === -1 ? 1 : X[k * data.d + col]);
+  const cls = task === "classification";
+  // what the model predicts for a row: a value for regression, a probability for classification
+  const out = (k: number) => (cls ? sigmoid(pred[k]) : pred[k]);
   const rows: SampleRow[] = [0, 1, 2].map((k) => ({
+    z: pred[k],
     y: y[k],
-    yhat: pred[k],
-    miss: y[k] - pred[k],
-    miss2: (y[k] - pred[k]) ** 2,
+    yhat: out(k),
+    miss: y[k] - out(k),
+    miss2: cls ? logLoss(pred[k], y[k]) : (y[k] - pred[k]) ** 2,
     x1: input(k, dials[0].col),
     x2: input(k, dials[1].col),
   }));
@@ -214,10 +223,29 @@ export async function buildMath(plan: Plan, data: Prepared, result: TrainResult,
   let s1 = 0;
   let s2 = 0;
   for (let k = 0; k < n; k++) {
-    s1 += (pred[k] - y[k]) * input(k, dials[0].col);
-    s2 += (pred[k] - y[k]) * input(k, dials[1].col);
+    s1 += (out(k) - y[k]) * input(k, dials[0].col);
+    s2 += (out(k) - y[k]) * input(k, dials[1].col);
   }
-  const exact: Vec2 = [(2 * s1) / n, (2 * s2) / n];
+  const scale = cls ? 1 / n : 2 / n;
+  const exact: Vec2 = [scale * s1, scale * s2];
+
+  // classification: exact curvature of the log-loss at the fitted weights, H = (1/N) sum p(1-p) x x^T
+  let hess: Lesson["hess"] = null;
+  if (cls) {
+    const atBest = Float64Array.from(net.forward(theta, X, n));
+    let h11 = 0;
+    let h12 = 0;
+    let h22 = 0;
+    for (let k = 0; k < n; k++) {
+      const p = sigmoid(atBest[k]);
+      const a = input(k, dials[0].col);
+      const c = input(k, dials[1].col);
+      h11 += p * (1 - p) * a * a;
+      h12 += p * (1 - p) * a * c;
+      h22 += p * (1 - p) * c * c;
+    }
+    hess = [h11 / n, h12 / n, h22 / n];
+  }
 
   const h = 0.01;
   const L1 = lossAt(start[0] + h, start[1]);
@@ -260,6 +288,8 @@ export async function buildMath(plan: Plan, data: Prepared, result: TrainResult,
     rho = g / data.ntr;
   }
   const lesson: Lesson = {
+    task,
+    hess,
     n,
     rho,
     names: [dials[0].name, dials[1].name],
@@ -292,5 +322,5 @@ export async function buildMath(plan: Plan, data: Prepared, result: TrainResult,
         : top2
           ? pairReason(data.names, pair[0], pair[1], rho, true)
           : `${data.names[pair[0]]} and ${data.names[pair[1]]} have the largest weights in the fitted model.`;
-  return { slice, grid, fit, lesson, path, pair, pairNote };
+  return { task, slice, grid, fit, lesson, path, pair, pairNote };
 }

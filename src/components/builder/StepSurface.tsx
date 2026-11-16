@@ -102,7 +102,7 @@ export function StepSummary({ b }: { b: MathBundle }) {
     <div>
       <h2 className="mb-3 text-2xl font-bold">11. Summary</h2>
       <p className="mb-4 text-[17px] leading-relaxed">
-        The loss surface of this model is a <b>{FIT_LABEL[fit.kind].toLowerCase()}</b>. The orange lines are the quadric surface from the previous two screens, drawn over the real loss values.
+        The loss surface of this model is {/^[aeiou]/i.test(FIT_LABEL[fit.kind]) ? "an" : "a"} <b>{FIT_LABEL[fit.kind].toLowerCase()}</b>. The orange lines are the quadric surface from the previous two screens, drawn over the real loss values.
       </p>
       <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
         <div>
@@ -121,7 +121,11 @@ export function StepSummary({ b }: { b: MathBundle }) {
             <div className="mt-1 text-sm text-gray-600">fit R² = {fit.r2.toFixed(3)}</div>
           </div>
           <ol className="list-decimal space-y-2 pl-5">
-            <li>L is a second-degree polynomial in the weights, so its graph is a quadric surface.</li>
+            <li>
+              {b.task === "classification"
+                ? "Log-loss is not exactly a polynomial, but near its minimum it is well approximated by a second-degree one, so its graph is close to a quadric surface."
+                : "L is a second-degree polynomial in the weights, so its graph is a quadric surface."}
+            </li>
             <li>
               The Hessian has eigenvalues μ₁ = {f(fit.mu1)} and μ₂ = {f(fit.mu2)}, which fixes the type.
             </li>

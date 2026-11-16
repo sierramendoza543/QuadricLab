@@ -1,6 +1,8 @@
 import { gaussian, rng } from "./random";
 import { Prepared } from "./profile";
 
+export type Task = "regression" | "classification";
+
 export type Activation = "relu" | "tanh" | "sigmoid";
 
 export type Block =
@@ -70,6 +72,11 @@ const act = {
   sigmoid: (s: number) => 1 / (1 + Math.exp(-s)),
 };
 
+const sigmoid = (z: number) => (z >= 0 ? 1 / (1 + Math.exp(-z)) : Math.exp(z) / (1 + Math.exp(z)));
+// cross-entropy of one row, written so large scores do not overflow
+export const logLoss = (z: number, y: number) => Math.max(z, 0) - y * z + Math.log1p(Math.exp(-Math.abs(z)));
+export { sigmoid };
+
 const slope = {
   relu: (a: number) => (a > 0 ? 1 : 0),
   tanh: (a: number) => 1 - a * a,
@@ -79,7 +86,7 @@ const slope = {
 export class Net {
   private buffers = new Map<number, Float64Array[]>();
 
-  constructor(public plan: Plan) {}
+  constructor(public plan: Plan, public task: Task = "regression") {}
 
   private acts(n: number) {
     let b = this.buffers.get(n);
@@ -113,6 +120,10 @@ export class Net {
   loss(theta: Float64Array, X: Float64Array, y: Float64Array, n: number): number {
     const out = this.forward(theta, X, n);
     let s = 0;
+    if (this.task === "classification") {
+      for (let r = 0; r < n; r++) s += logLoss(out[r], y[r]);
+      return s / n;
+    }
     for (let r = 0; r < n; r++) {
       const e = out[r] - y[r];
       s += e * e;
@@ -126,10 +137,17 @@ export class Net {
     grad.fill(0);
     let loss = 0;
     let da = new Float64Array(n);
-    for (let r = 0; r < n; r++) {
-      const e = out[r] - y[r];
-      loss += e * e;
-      da[r] = (2 * e) / n;
+    if (this.task === "classification") {
+      for (let r = 0; r < n; r++) {
+        loss += logLoss(out[r], y[r]);
+        da[r] = (sigmoid(out[r]) - y[r]) / n;
+      }
+    } else {
+      for (let r = 0; r < n; r++) {
+        const e = out[r] - y[r];
+        loss += e * e;
+        da[r] = (2 * e) / n;
+      }
     }
     for (let li = this.plan.layers.length - 1; li >= 0; li--) {
       const l = this.plan.layers[li];
@@ -177,6 +195,7 @@ export interface TrainResult {
   diverged: boolean;
   r2Train: number;
   r2Val: number;
+  cls: { accTrain: number; accVal: number; baseVal: number; lossTrain: number; lossVal: number } | null;
 }
 
 const variance = (y: Float64Array) => {
@@ -243,6 +262,22 @@ export async function train(
 
   const lt = net.loss(theta, data.Xtr, data.ytr, data.ntr);
   const lv = net.loss(theta, data.Xva, data.yva, data.nva);
+  let cls: TrainResult["cls"] = null;
+  if (net.task === "classification") {
+    const score = (X: Float64Array, y: Float64Array, n: number) => {
+      const z = net.forward(theta, X, n);
+      let ok = 0;
+      let pos = 0;
+      for (let r = 0; r < n; r++) {
+        if ((z[r] > 0 ? 1 : 0) === y[r]) ok++;
+        pos += y[r];
+      }
+      return { acc: ok / n, base: Math.max(pos, n - pos) / n };
+    };
+    const a = score(data.Xtr, data.ytr, data.ntr);
+    const b = score(data.Xva, data.yva, data.nva);
+    cls = { accTrain: a.acc, accVal: b.acc, baseVal: b.base, lossTrain: lt, lossVal: lv };
+  }
   return {
     theta,
     start,
@@ -250,7 +285,8 @@ export async function train(
     trainLoss,
     valLoss,
     diverged,
-    r2Train: 1 - lt / variance(data.ytr),
-    r2Val: 1 - lv / variance(data.yva),
+    r2Train: cls ? 0 : 1 - lt / variance(data.ytr),
+    r2Val: cls ? 0 : 1 - lv / variance(data.yva),
+    cls,
   };
 }

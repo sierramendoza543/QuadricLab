@@ -46,10 +46,10 @@ export default function BuilderPage() {
   const fresh = trained && trained.key === key ? trained.result : null;
   const ready = !!fresh && !fresh.diverged;
 
-  const code = useMemo(() => (prepared && choice ? pytorchCode(prepared.names, prepared.target, choice.degree, choice.cfg) : ""), [prepared, choice]);
+  const code = useMemo(() => (prepared && choice ? pytorchCode(prepared.names, prepared.target, choice.degree, choice.cfg, prepared.task) : ""), [prepared, choice]);
 
   const rmse = useMemo(() => {
-    if (!fresh || !prepared || fresh.diverged) return null;
+    if (!fresh || !prepared || fresh.diverged || prepared.task === "classification") return null;
     const out = new Net(plan).forward(fresh.theta, prepared.Xva, prepared.nva);
     let s = 0;
     for (let k = 0; k < prepared.nva; k++) s += (out[k] - prepared.yva[k]) ** 2;
@@ -115,7 +115,7 @@ export default function BuilderPage() {
     setRunning(true);
     setTrained(null);
     setLoss([]);
-    const result = await train(new Net(plan), prepared, choice.cfg, (_e, t) => setLoss(t.slice()), () => cancel.current);
+    const result = await train(new Net(plan, prepared.task), prepared, choice.cfg, (_e, t) => setLoss(t.slice()), () => cancel.current);
     setLoss(result.trainLoss);
     setTrained({ key, result });
     setRunning(false);

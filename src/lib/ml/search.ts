@@ -1,4 +1,4 @@
-import { Table } from "./datasets";
+import { ClassInfo, Table } from "./datasets";
 import { Term, splitIndices, termValue } from "./profile";
 import { solve } from "./linalg";
 
@@ -169,10 +169,15 @@ export function searchTerms(t: Table, target: number, feats: number[], ai: AiTer
   return { terms: finalIdx.map((i) => pool[i]), base: baseTerms.length, steps, r2Linear, r2Final: finalR2, chosen, compared };
 }
 
-export function describeSearch(r: SearchResult, target: string): string {
+export function describeSearch(r: SearchResult, target: string, cls: ClassInfo | null = null): string {
   const extra = r.terms.slice(r.base);
+  const who = r.chosen === "ai" ? "The AI review suggested, and held-out scoring confirmed," : "A search over squared and interaction terms found";
+  if (cls) {
+    const lead = `${target} has two values, so this is a classification problem: the model gives the probability that ${cls.label}. Candidate terms are ranked by fitting a least-squares line to the 0/1 labels (a linear discriminant) and scoring it on held-out rows.`;
+    if (!extra.length) return `${lead} Plain predictors score ${pct(r.r2Linear)} and no extra term improved that, so the score stays linear in the predictors.`;
+    return `${lead} Plain predictors score ${pct(r.r2Linear)}. ${who} these extra terms: ${extra.map((e) => e.name).join(", ")}. They raise the score to ${pct(r.r2Final)}. The score z is still linear in the weights, and a sigmoid then turns z into a probability.`;
+  }
   if (!extra.length) return `A linear model explains ${pct(r.r2Linear)} of the variance in ${target} on held-out rows, and no extra terms improved it, so we keep the model linear.`;
   const names = extra.map((e) => e.name).join(", ");
-  const who = r.chosen === "ai" ? "The AI review suggested, and held-out scoring confirmed," : "A search over squared and interaction terms found";
   return `A linear model explains ${pct(r.r2Linear)} of the variance in ${target} on held-out rows. ${who} these extra terms: ${names}. They raise it to ${pct(r.r2Final)}. The model is still linear in its weights, which keeps the calculus that follows exact.`;
 }

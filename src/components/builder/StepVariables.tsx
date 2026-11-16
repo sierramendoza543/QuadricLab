@@ -1,7 +1,7 @@
 "use client";
 
 import { AiReview } from "@/lib/ml/ai";
-import { Table, sourcesOf, targetColumns } from "@/lib/ml/datasets";
+import { Table, classInfo, sourcesOf, targetColumns } from "@/lib/ml/datasets";
 
 interface Props {
   table: Table;
@@ -17,6 +17,7 @@ const fmt = (v: number) => (Number.isInteger(v) || Math.abs(v) >= 1000 ? v.toFix
 export default function StepVariables({ table, target, feats, review, onTarget, onFeats }: Props) {
   const sources = sourcesOf(table);
   const idx = (c: string) => table.columns.indexOf(c);
+  const ci = classInfo(table, target);
   const targetSource = sources.find((s) => s.columns.includes(table.columns[target]));
   const note = (name: string) => review?.column_notes.find((n) => n.name === name)?.note ?? table.notes?.[name];
 
@@ -104,6 +105,11 @@ export default function StepVariables({ table, target, feats, review, onTarget, 
         ) : (
           <>
             Model: predict <b>{table.columns[target]}</b> from <b>{feats.map((j) => table.columns[j]).join(", ")}</b>.
+            {ci && (
+              <span className="mt-1 block text-gray-700">
+                {table.columns[target]} has only two values, so this is a <b>classification</b> problem. The model gives the probability that {ci.label}.
+              </span>
+            )}
           </>
         )}
       </p>

@@ -1,4 +1,5 @@
-import { Table } from "./datasets";
+import { Table, classInfo } from "./datasets";
+import type { Task } from "./engine";
 import { rng } from "./random";
 
 export interface ColumnStat {
@@ -23,6 +24,8 @@ export interface Term {
 }
 
 export interface Prepared {
+  task: Task;
+  classLabel: string | null;
   names: string[];
   parts: number[][];
   target: string;
@@ -102,7 +105,13 @@ export function profileData(t: Table, target: number, feats: number[], r2Linear:
       `${names[worst.a]} and ${names[worst.b]} are almost perfectly correlated (r = ${worst.r.toFixed(3)}), so they carry the same information. The weights are then not uniquely determined, and the loss surface will show it.`
     );
 
-  if (r2Linear !== null)
+  const ci = classInfo(t, target);
+  if (ci) {
+    const share = ci.n1 / (ci.n1 + ci.n0);
+    observations.push(
+      `${names[feats.length]} has two values, so this is a classification problem. ${Math.round(share * 100)}% of the rows have ${ci.label}, so always guessing the more common class is right ${Math.round(Math.max(share, 1 - share) * 100)}% of the time. A useful model has to beat that.`
+    );
+  } else if (r2Linear !== null)
     observations.push(
       r2Linear >= 0.9
         ? `A linear model explains about ${Math.round(r2Linear * 100)}% of the variance in ${names[feats.length]}.`
@@ -135,9 +144,11 @@ export function prepare(t: Table, target: number, terms: Term[]): Prepared {
   const trVals = vals(tr);
   const xm = trVals.map(mean);
   const xs = trVals.map((c, k) => sd(c, xm[k]));
+  const ci = classInfo(t, target);
   const ytrRaw = tr.map((i) => t.rows[i][target]);
-  const ym = mean(ytrRaw);
-  const ys = sd(ytrRaw, ym);
+  // a classification target stays 0/1; a regression target is standardized
+  const ym = ci ? 0 : mean(ytrRaw);
+  const ys = ci ? 1 : sd(ytrRaw, ym);
 
   const build = (ids: number[]) => {
     const v = vals(ids);
@@ -145,13 +156,15 @@ export function prepare(t: Table, target: number, terms: Term[]): Prepared {
     const y = new Float64Array(ids.length);
     ids.forEach((row, a) => {
       for (let k = 0; k < d; k++) X[a * d + k] = (v[k][a] - xm[k]) / xs[k];
-      y[a] = (t.rows[row][target] - ym) / ys;
+      y[a] = ci ? (t.rows[row][target] === ci.hi ? 1 : 0) : (t.rows[row][target] - ym) / ys;
     });
     return { X, y };
   };
   const trn = build(tr);
   const val = build(va);
   return {
+    task: ci ? "classification" : "regression",
+    classLabel: ci ? ci.label : null,
     names: terms.map((tm) => tm.name),
     parts: terms.map((tm) => tm.parts),
     target: t.columns[target],

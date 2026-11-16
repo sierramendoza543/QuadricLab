@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Table } from "@/lib/ml/datasets";
+import { Table, classInfo } from "@/lib/ml/datasets";
 import { profileData } from "@/lib/ml/profile";
 import Scatter from "./Scatter";
 
@@ -20,7 +20,11 @@ export default function StepExplore({ table, target, feats, r2Linear }: Props) {
   const k = Math.min(pick, feats.length - 1);
   const j = feats[k];
 
-  const pts = table.rows.map((r) => ({ x: r[j], y: r[target] }));
+  const ci = classInfo(table, target);
+  const wob = (i: number) => (((i * 9301 + 49297) % 233280) / 233280 - 0.5) * 0.07;
+  const pts = table.rows.map((r, i) => ({ x: r[j], y: ci ? (r[target] === ci.hi ? 1 : 0) + wob(i) : r[target] }));
+  const mean1 = ci ? table.rows.filter((r) => r[target] === ci.hi).reduce((a, r) => a + r[j], 0) / ci.n1 : 0;
+  const mean0 = ci ? table.rows.filter((r) => r[target] !== ci.hi).reduce((a, r) => a + r[j], 0) / ci.n0 : 0;
   const mx = pts.reduce((s, q) => s + q.x, 0) / pts.length;
   const my = pts.reduce((s, q) => s + q.y, 0) / pts.length;
   let sxx = 0;
@@ -78,8 +82,12 @@ export default function StepExplore({ table, target, feats, r2Linear }: Props) {
         </span>
       </div>
       <div className="max-w-xl">
-        <Scatter points={pts} xLabel={table.columns[j]} yLabel={table.columns[target]} line={{ a: slope, b: my - slope * mx }} />
-        <p className="mt-1 text-sm text-gray-500">Red line: least-squares line for this predictor alone.</p>
+        <Scatter points={pts} xLabel={table.columns[j]} yLabel={ci ? `${table.columns[target]} (0 or 1)` : table.columns[target]} line={ci ? null : { a: slope, b: my - slope * mx }} />
+        <p className="mt-1 text-sm text-gray-500">
+          {ci
+            ? `Each dot is a row, nudged up or down a little so they do not overlap. Average ${table.columns[j]}: ${fmt(mean1)} when ${ci.label}, ${fmt(mean0)} otherwise. The more these differ, the more this predictor tells the classes apart.`
+            : "Red line: least-squares line for this predictor alone."}
+        </p>
       </div>
 
       {p.observations.length > 0 && (

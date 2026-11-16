@@ -25,13 +25,25 @@ const P = ({ children }: { children: React.ReactNode }) => <p className="my-3 te
 export function MathLoss({ b }: Props) {
   const L = b.lesson;
   const [a, c] = L.start;
+  const cls = b.task === "classification";
   return (
     <div>
       <Heading n={5} title="The loss function" />
+      {cls ? (
+        <>
+          <P>
+            To judge a classifier, compare the predicted probability <Tex tex={String.raw`\hat p_i`} /> with the actual label <Tex tex={"y_i"} /> (1 or 0). The <b>cross-entropy</b>, also called <b>log-loss</b>, charges <Tex tex={String.raw`-\ln\hat p`} /> when the label is 1 and <Tex tex={String.raw`-\ln(1-\hat p)`} /> when it is 0. A confident wrong answer costs a lot, and a confident right answer costs almost nothing. We call the average the <b>loss</b>, L.
+          </P>
+          <Paper lines={[T`L = -\frac{1}{N}\sum_{i=1}^{N}\Big[\,y_i\ln\hat p_i + (1-y_i)\ln(1-\hat p_i)\Big]`, T`\hat p_i = \sigma(z_i),\qquad z_i = b + w_1x_{i1}+w_2x_{i2}+\cdots`]} />
+        </>
+      ) : (
+      <>
       <P>
         To judge a model, compare each prediction <Tex tex={String.raw`\hat y_i`} /> with the actual value <Tex tex={"y_i"} />. The <b>mean squared error</b> averages the squared differences. We call it the <b>loss</b>, L.
       </P>
       <Paper lines={[T`L = \frac{1}{N}\sum_{i=1}^{N}\left(y_i-\hat y_i\right)^2`]} />
+      </>
+      )}
       <P>
         Example. Try the weights <Tex tex={`w_1=${f(a)}`} /> (on {L.names[0]}) and <Tex tex={`w_2=${f(c)}`} /> (on {L.names[1]})
         {L.frozen ? ", with every other weight held at its fitted value" : ""}. For the first three rows:
@@ -39,7 +51,7 @@ export function MathLoss({ b }: Props) {
       <table className="mb-1 w-full max-w-xl border border-gray-300 text-left text-[16px]">
         <thead className="bg-gray-100">
           <tr>
-            {["i", "y", "ŷ", "y − ŷ", "(y − ŷ)²"].map((h) => (
+            {(cls ? ["i", "y", "z", "p̂ = σ(z)", "loss of this row"] : ["i", "y", "ŷ", "y − ŷ", "(y − ŷ)²"]).map((h) => (
               <th key={h} className="border-b border-gray-300 px-3 py-1.5">
                 {h}
               </th>
@@ -50,15 +62,25 @@ export function MathLoss({ b }: Props) {
           {L.rows.map((r, i) => (
             <tr key={i} className={rowStyle}>
               <td className="px-3 py-1">{i + 1}</td>
-              <td>{f(r.y)}</td>
-              <td>{f(r.yhat)}</td>
-              <td>{f(r.miss)}</td>
-              <td>{f(r.miss2)}</td>
+              <td>{f(r.y, cls ? 0 : 3)}</td>
+              {cls ? (
+                <>
+                  <td>{f(r.z)}</td>
+                  <td>{f(r.yhat)}</td>
+                  <td>{f(r.miss2)}</td>
+                </>
+              ) : (
+                <>
+                  <td>{f(r.yhat)}</td>
+                  <td>{f(r.miss)}</td>
+                  <td>{f(r.miss2)}</td>
+                </>
+              )}
             </tr>
           ))}
         </tbody>
       </table>
-      <p className="mb-1 text-sm text-gray-500">y is standardized, so 0 is the mean of the data.</p>
+      <p className="mb-1 text-sm text-gray-500">{cls ? "Each row's loss is −ln p̂ if y = 1 and −ln(1 − p̂) if y = 0." : "y is standardized, so 0 is the mean of the data."}</p>
       <Paper
         lines={[
           T`L &= \frac{1}{${L.n}}\left(${f(L.rows[0].miss2)} + ${f(L.rows[1].miss2)} + ${f(L.rows[2].miss2)} + \cdots\right)`,
@@ -74,6 +96,7 @@ export function MathLoss({ b }: Props) {
 
 export function MathSlope({ b }: Props) {
   const L = b.lesson;
+  const cls = b.task === "classification";
   const [a, c] = L.start;
   const h = L.h;
   return (
@@ -113,15 +136,31 @@ export function MathSlope({ b }: Props) {
       </P>
       <details className="border border-gray-300 p-3">
         <summary className="cursor-pointer font-bold">Check with the exact formula</summary>
-        <p className="mt-2 text-[16px]">
-          For one row, the chain rule gives the derivative of <Tex tex={"(y-\\hat y)^2"} /> as <Tex tex={"2(\\hat y-y)\\,x"} />, where <Tex tex={"x"} /> is the predictor that the weight multiplies. Averaging over all rows:
-        </p>
-        <Paper
-          lines={[
-            T`\frac{\partial L}{\partial w_1} &= \frac{2}{N}\sum_{i}(\hat y_i-y_i)\,x_{i1} = ${f(L.exact[0], 3)}`,
-            T`\frac{\partial L}{\partial w_2} &= \frac{2}{N}\sum_{i}(\hat y_i-y_i)\,x_{i2} = ${f(L.exact[1], 3)}`,
-          ]}
-        />
+        {cls ? (
+          <>
+            <p className="mt-2 text-[16px]">
+              For one row, the chain rule gives <Tex tex={String.raw`\partial\ell/\partial z = \hat p - y`} />: the derivative of the sigmoid cancels against the derivative of the logarithm, which is why log-loss is paired with the sigmoid. Then <Tex tex={String.raw`\partial z/\partial w = x`} />, and averaging over all rows:
+            </p>
+            <Paper
+              lines={[
+                T`\frac{\partial L}{\partial w_1} &= \frac{1}{N}\sum_{i}(\hat p_i-y_i)\,x_{i1} = ${f(L.exact[0], 3)}`,
+                T`\frac{\partial L}{\partial w_2} &= \frac{1}{N}\sum_{i}(\hat p_i-y_i)\,x_{i2} = ${f(L.exact[1], 3)}`,
+              ]}
+            />
+          </>
+        ) : (
+          <>
+            <p className="mt-2 text-[16px]">
+              For one row, the chain rule gives the derivative of <Tex tex={"(y-\\hat y)^2"} /> as <Tex tex={"2(\\hat y-y)\\,x"} />, where <Tex tex={"x"} /> is the predictor that the weight multiplies. Averaging over all rows:
+            </p>
+            <Paper
+              lines={[
+                T`\frac{\partial L}{\partial w_1} &= \frac{2}{N}\sum_{i}(\hat y_i-y_i)\,x_{i1} = ${f(L.exact[0], 3)}`,
+                T`\frac{\partial L}{\partial w_2} &= \frac{2}{N}\sum_{i}(\hat y_i-y_i)\,x_{i2} = ${f(L.exact[1], 3)}`,
+              ]}
+            />
+          </>
+        )}
         <p className="text-[16px]">These match the estimates above.</p>
       </details>
     </div>
@@ -181,13 +220,29 @@ export function MathQuadratic({ b }: Props) {
   const { A, B, C, D, E, F } = L.quad;
   const h11 = 2 * A;
   const h22 = 2 * C;
+  const cls = b.task === "classification";
   return (
     <div>
-      <Heading n={9} title="The loss is a quadratic function" />
+      <Heading n={9} title={cls ? "The loss is close to a quadratic function" : "The loss is a quadratic function"} />
+      {cls ? (
+        <>
+          <P>
+            In Chapter 12, a <b>quadric surface</b> is the graph of a second-degree equation in x, y and z. For a regression the squared error is exactly a second-degree polynomial in the weights. Log-loss is not: the sigmoid is not linear, and far from the minimum the loss grows like a straight line, not a parabola.
+          </P>
+          <P>
+            Near the minimum, though, any smooth function is well approximated by its <b>second-degree Taylor polynomial</b>, and that polynomial is a quadric. We fit it to the loss values in the middle of the surface:
+          </P>
+          <Paper lines={[T`L(w_1,w_2) \approx A\,w_1^2 + B\,w_1w_2 + C\,w_2^2 + D\,w_1 + E\,w_2 + F`]} />
+          <p className="mb-3 text-[15px] text-gray-600">
+            Quality of the approximation over that window: R² = {b.fit.r2.toFixed(3)}. The closer to 1, the more the loss behaves like a true quadric there.
+          </p>
+        </>
+      ) : (
       <P>
         In Chapter 12, a <b>quadric surface</b> is the graph of a second-degree equation in x, y and z. Here the predictions <Tex tex={"\\hat y"} /> are linear in the weights, so the error <Tex tex={"y-\\hat y"} /> is linear too, and squaring it makes L a second-degree polynomial in <Tex tex={"w_1"} /> and <Tex tex={"w_2"} />:
       </P>
-      <Paper lines={[T`L(w_1,w_2) = A\,w_1^2 + B\,w_1w_2 + C\,w_2^2 + D\,w_1 + E\,w_2 + F`]} />
+      )}
+      {!cls && <Paper lines={[T`L(w_1,w_2) = A\,w_1^2 + B\,w_1w_2 + C\,w_2^2 + D\,w_1 + E\,w_2 + F`]} />}
       <P>For this model the coefficients are:</P>
       <Paper
         lines={[
@@ -205,8 +260,24 @@ export function MathQuadratic({ b }: Props) {
           T`L_{w_1w_2} &= B = ${f(B)}`,
         ]}
       />
-      <P>They do not depend on w₁ or w₂, because L is quadratic. Put them in the <b>Hessian matrix</b>:</P>
+      <P>{cls ? "In the quadratic approximation they do not depend on w₁ or w₂. Put them" : "They do not depend on w₁ or w₂, because L is quadratic. Put them"} in the <b>Hessian matrix</b>:</P>
       <Paper lines={[T`H = \begin{bmatrix} L_{w_1w_1} & L_{w_1w_2} \\ L_{w_1w_2} & L_{w_2w_2} \end{bmatrix} = \begin{bmatrix} ${f(h11)} & ${f(B)} \\ ${f(B)} & ${f(h22)} \end{bmatrix}`]} />
+      {cls && L.hess && (
+        <details className="mt-3 border border-gray-300 p-3">
+          <summary className="cursor-pointer font-bold">Check with the exact formula</summary>
+          <p className="mt-2 text-[16px]">
+            Differentiating <Tex tex={String.raw`\partial L/\partial w=\frac1N\sum(\hat p-y)x`} /> once more uses <Tex tex={String.raw`\sigma'(z)=\hat p(1-\hat p)`} />, so at the fitted weights:
+          </p>
+          <Paper
+            lines={[
+              T`L_{w_1w_1} &= \frac{1}{N}\sum_i \hat p_i(1-\hat p_i)\,x_{i1}^2 = ${f(L.hess[0])}`,
+              T`L_{w_1w_2} &= \frac{1}{N}\sum_i \hat p_i(1-\hat p_i)\,x_{i1}x_{i2} = ${f(L.hess[1])}`,
+              T`L_{w_2w_2} &= \frac{1}{N}\sum_i \hat p_i(1-\hat p_i)\,x_{i2}^2 = ${f(L.hess[2])}`,
+            ]}
+          />
+          <p className="text-[16px]">These are the exact second derivatives at the minimum. Compare them with 2A, B and 2C from the fit above. They agree when the surface is close to a parabola across the whole window, and differ where it is not, for example along a weight whose sigmoid has saturated.</p>
+        </details>
+      )}
     </div>
   );
 }
@@ -275,7 +346,9 @@ export function MathClassify({ b }: Props) {
         {L.rho !== 0 ? <> (correlation {f(L.rho, 2)} between those terms)</> : ""}. The ratio μ₁/μ₂ = {Number.isFinite(fit.condition) ? f(fit.condition, 1) : "∞"} says how much steeper the bowl is along one axis than the other: the larger it is, the more a descent path zig-zags.
       </P>
       <p className="mb-3 text-[16px] text-gray-700">
-        A saddle (hyperbolic paraboloid) cannot appear here. The mean squared error of a model that is linear in its weights is convex, so neither eigenvalue is ever negative. Saddles show up in min–max problems such as GANs, which the Quadric Explorer covers.
+        {b.task === "classification"
+          ? "A saddle (hyperbolic paraboloid) cannot appear here either. The Hessian of the log-loss is (1/N) Σ p̂(1 − p̂) x xᵀ. Every weight p̂(1 − p̂) is positive, so the loss is convex and neither eigenvalue is negative. One thing is new: if the two classes can be separated perfectly by a line, the curvature along the separating direction shrinks toward 0, the minimum runs off to infinity, and the surface looks like a trough that keeps getting flatter."
+          : "A saddle (hyperbolic paraboloid) cannot appear here. The mean squared error of a model that is linear in its weights is convex, so neither eigenvalue is ever negative."} Saddles show up in min–max problems such as GANs, which the Quadric Explorer covers.
       </p>
       <p className="text-[16px] text-gray-700">
         Here <Tex tex={"u_1,u_2"} /> are the coordinates <Tex tex={"(w_1-w_1^*,\\ w_2-w_2^*)"} /> rotated by θ = {f(deg, 1)}°, where <Tex tex={`(w_1^*,w_2^*)=(${f(L.best[0])},\\,${f(L.best[1])})`} /> is the minimum.

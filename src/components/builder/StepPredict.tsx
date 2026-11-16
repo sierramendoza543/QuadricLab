@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Table } from "@/lib/ml/datasets";
 import { Prepared, Term } from "@/lib/ml/profile";
+import { sigmoid } from "@/lib/ml/engine";
 import { Inputs, defaultInputs, predictRow, usedSources } from "@/lib/ml/predict";
 
 interface Props {
@@ -25,6 +26,8 @@ export default function StepPredict({ table, target, terms, prepared, theta }: P
   const [values, setValues] = useState<Inputs>(() => defaultInputs(sources));
   const p = useMemo(() => predictRow(table, sources, prepared, terms, theta, values), [table, sources, prepared, terms, theta, values]);
   const name = table.columns[target];
+  const cls = prepared.task === "classification";
+  const prob = sigmoid(p.yhat);
 
   const sorted = [...p.contributions].sort((a, b) => Math.abs(b.effect) - Math.abs(a.effect));
   const shown = sorted.slice(0, 8);
@@ -36,7 +39,15 @@ export default function StepPredict({ table, target, terms, prepared, theta }: P
     <div>
       <h2 className="mb-2 text-2xl font-bold">12. Try the model</h2>
       <p className="mb-4 text-[17px] leading-relaxed">
-        Enter values for the predictors and the fitted model predicts <b>{name}</b>. Each bar below is one term: its weight times how far your input is from average. The bars add up to the prediction.
+        {cls ? (
+          <>
+            Enter values for the predictors and the fitted model gives the probability that <b>{prepared.classLabel}</b>. Each bar below is one term: its weight times how far your input is from average, in log-odds. The bars add up to the score z, and the sigmoid turns z into the probability.
+          </>
+        ) : (
+          <>
+            Enter values for the predictors and the fitted model predicts <b>{name}</b>. Each bar below is one term: its weight times how far your input is from average. The bars add up to the prediction.
+          </>
+        )}
       </p>
 
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
@@ -83,12 +94,27 @@ export default function StepPredict({ table, target, terms, prepared, theta }: P
 
         <div>
           <div className="mb-4 border border-gray-300 bg-gray-50 px-4 py-3">
-            <div className="text-[15px] text-gray-600">Predicted {name}</div>
-            <div className="text-[34px] font-bold tabular-nums">{money(p.yhat)}</div>
+            {cls ? (
+              <>
+                <div className="text-[15px] text-gray-600">Probability that {prepared.classLabel}</div>
+                <div className="text-[34px] font-bold tabular-nums">{(prob * 100).toFixed(1)}%</div>
+                <div className="text-[15px] text-gray-700">
+                  Predicted label: <b>{prob >= 0.5 ? 1 : 0}</b> (the model says {prepared.classLabel} is {prob >= 0.5 ? "more" : "less"} likely than not) · score z = {p.yhat.toFixed(2)}
+                </div>
+                <div className="mt-2 h-3 w-full bg-gray-200">
+                  <div className="h-3 bg-blue-600 transition-all duration-300" style={{ width: `${prob * 100}%` }} />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-[15px] text-gray-600">Predicted {name}</div>
+                <div className="text-[34px] font-bold tabular-nums">{money(p.yhat)}</div>
+              </>
+            )}
           </div>
 
           <div className="mb-1 flex justify-between text-[15px]">
-            <span>Starting point: the model&apos;s prediction for an average row</span>
+            <span>Starting point: {cls ? "the score z for an average row" : "the model's prediction for an average row"}</span>
             <b className="tabular-nums">{money(p.base)}</b>
           </div>
           <div className="mb-2 border-t border-gray-300" />
@@ -115,8 +141,8 @@ export default function StepPredict({ table, target, terms, prepared, theta }: P
             </div>
           )}
           <div className="mt-2 flex justify-between border-t border-gray-300 pt-2 font-bold">
-            <span>Prediction</span>
-            <span className="tabular-nums">{money(p.yhat)}</span>
+            <span>{cls ? "Score z, then P = σ(z)" : "Prediction"}</span>
+            <span className="tabular-nums">{cls ? `${p.yhat.toFixed(2)} → ${(prob * 100).toFixed(1)}%` : money(p.yhat)}</span>
           </div>
 
           <details className="mt-4 border border-gray-300 p-3">
@@ -124,7 +150,7 @@ export default function StepPredict({ table, target, terms, prepared, theta }: P
             <table className="mt-2 w-full text-left text-[14px]">
               <thead className="bg-gray-100">
                 <tr>
-                  {["Term", "Standardized input z", "Weight w", `Effect w·z (in ${name} units)`].map((h) => (
+                  {["Term", "Standardized input z", "Weight w", cls ? "Effect w·z (log-odds)" : `Effect w·z (in ${name} units)`].map((h) => (
                     <th key={h} className="border-b border-gray-300 px-2 py-1">
                       {h}
                     </th>
@@ -142,7 +168,7 @@ export default function StepPredict({ table, target, terms, prepared, theta }: P
                 ))}
               </tbody>
             </table>
-            <p className="mt-2 text-sm text-gray-600">z = (term value − its average) ÷ its standard deviation. Effects are the weights converted back to {name} units.</p>
+            <p className="mt-2 text-sm text-gray-600">z = (term value − its average) ÷ its standard deviation. {cls ? "Effects are in log-odds, the units of the score z." : `Effects are the weights converted back to ${name} units.`}</p>
           </details>
         </div>
       </div>

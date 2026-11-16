@@ -31,10 +31,38 @@ export function sourcesOf(t: Table): Source[] {
   });
 }
 
-// columns that can be predicted: the numeric ones from the original file
+// columns that can be predicted: numeric columns, and the 0/1 column of a text column with two values
 export function targetColumns(t: Table): number[] {
-  const numeric = new Set(sourcesOf(t).filter((s) => s.kind === "numeric").flatMap((s) => s.columns));
-  return t.columns.map((c, j) => (numeric.has(c) ? j : -1)).filter((j) => j >= 0);
+  const ok = new Set<string>();
+  for (const s of sourcesOf(t)) {
+    if (s.kind === "numeric") s.columns.forEach((c) => ok.add(c));
+    else if (s.dummies?.length === 1) ok.add(s.dummies[0].column);
+  }
+  return t.columns.map((c, j) => (ok.has(c) ? j : -1)).filter((j) => j >= 0);
+}
+
+export interface ClassInfo {
+  lo: number;
+  hi: number;
+  label: string; // what the model gives a probability for
+  n1: number;
+  n0: number;
+}
+
+// a column with exactly two distinct values is a classification target
+export function classInfo(t: Table, target: number): ClassInfo | null {
+  const vals = new Set<number>();
+  for (const r of t.rows) {
+    vals.add(r[target]);
+    if (vals.size > 2) return null;
+  }
+  if (vals.size !== 2) return null;
+  const [lo, hi] = [...vals].sort((a, b) => a - b);
+  const col = t.columns[target];
+  const src = sourcesOf(t).find((s) => s.columns.includes(col));
+  const dummy = src?.dummies?.find((d) => d.column === col);
+  const n1 = t.rows.filter((r) => r[target] === hi).length;
+  return { lo, hi, label: dummy ? `${src!.name} = ${dummy.level}` : `${col} = ${hi}`, n1, n0: t.rows.length - n1 };
 }
 
 export interface BundledDataset {
@@ -155,6 +183,86 @@ export const BUNDLED: BundledDataset[] = [
           water_l: "liters of water it gets per day",
           growth_cm: "how much it grew, in cm",
         },
+      };
+    },
+  },
+  {
+    id: "exam",
+    title: "Exam pass or fail",
+    blurb: "Whether 300 students passed, from hours studied and hours slept. A classification problem.",
+    lesson: "Predict yes or no",
+    size: "300 rows · 3 columns",
+    build: () => {
+      const r = rng(17);
+      const rows: number[][] = [];
+      for (let i = 0; i < 300; i++) {
+        const study = uniform(r, 0, 10);
+        const sleep = uniform(r, 4, 10);
+        const logit = 1.1 * (study - 5) + 0.6 * (sleep - 7) + gaussian(r) * 0.8;
+        rows.push([Math.round(study * 10) / 10, Math.round(sleep * 10) / 10, logit > 0 ? 1 : 0]);
+      }
+      return {
+        name: "Exam pass or fail",
+        columns: ["hours_studied", "hours_slept", "passed"],
+        rows,
+        rowMeaning: "one student",
+        notes: {
+          hours_studied: "hours spent studying for the exam",
+          hours_slept: "hours of sleep the night before",
+          passed: "1 if the student passed, 0 if not",
+        },
+      };
+    },
+  },
+  {
+    id: "loans",
+    title: "Loan approval",
+    blurb: "Whether 400 loan applications were approved, from income and savings. The two predictors move together.",
+    lesson: "Correlated predictors",
+    size: "400 rows · 3 columns",
+    build: () => {
+      const r = rng(29);
+      const rows: number[][] = [];
+      for (let i = 0; i < 400; i++) {
+        const income = clamp(60 + gaussian(r) * 15, 20, 120);
+        const savings = clamp(0.8 * income + gaussian(r) * 9, 0, 150);
+        const logit = 0.09 * (income - 60) + 0.07 * (savings - 48) + gaussian(r) * 0.9;
+        rows.push([Math.round(income * 10) / 10, Math.round(savings * 10) / 10, logit > 0 ? 1 : 0]);
+      }
+      return {
+        name: "Loan approval",
+        columns: ["income_k", "savings_k", "approved"],
+        rows,
+        rowMeaning: "one loan application",
+        notes: {
+          income_k: "yearly income, in thousands of dollars",
+          savings_k: "savings, in thousands of dollars (people with higher income save more)",
+          approved: "1 if the loan was approved, 0 if not",
+        },
+      };
+    },
+  },
+  {
+    id: "zone",
+    title: "Target zone",
+    blurb: "Points inside or outside a circle. No straight line separates them, so the model needs squared terms.",
+    lesson: "Needs a curved boundary",
+    size: "300 rows · 3 columns",
+    build: () => {
+      const r = rng(53);
+      const rows: number[][] = [];
+      for (let i = 0; i < 300; i++) {
+        const x = uniform(r, -3, 3);
+        const y = uniform(r, -3, 3);
+        const inside = x * x + y * y + gaussian(r) * 0.8 < 4 ? 1 : 0;
+        rows.push([Math.round(x * 100) / 100, Math.round(y * 100) / 100, inside]);
+      }
+      return {
+        name: "Target zone",
+        columns: ["x", "y", "inside"],
+        rows,
+        rowMeaning: "one point",
+        notes: { x: "horizontal position", y: "vertical position", inside: "1 if the point is inside the target circle, 0 if outside" },
       };
     },
   },
