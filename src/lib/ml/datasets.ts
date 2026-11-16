@@ -67,6 +67,7 @@ export function classInfo(t: Table, target: number): ClassInfo | null {
 
 export interface BundledDataset {
   id: string;
+  task: "regression" | "classification";
   title: string;
   blurb: string;
   lesson: string;
@@ -80,6 +81,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 export const BUNDLED: BundledDataset[] = [
   {
     id: "housing",
+    task: "regression",
     title: "House prices",
     blurb: "Sale price of 300 houses with floor area, bedrooms, age and distance to the city center.",
     lesson: "Columns on different scales",
@@ -112,6 +114,7 @@ export const BUNDLED: BundledDataset[] = [
   },
   {
     id: "temperature",
+    task: "regression",
     title: "Energy and temperature",
     blurb: "Daily energy use of a building against outdoor temperature, recorded in both Celsius and Fahrenheit.",
     lesson: "Two columns say the same thing",
@@ -139,6 +142,7 @@ export const BUNDLED: BundledDataset[] = [
   },
   {
     id: "sine",
+    task: "regression",
     title: "Sine wave",
     blurb: "A noisy sine wave: one predictor and a clearly nonlinear response.",
     lesson: "Needs a curve",
@@ -161,6 +165,7 @@ export const BUNDLED: BundledDataset[] = [
   },
   {
     id: "plants",
+    task: "regression",
     title: "Plant growth",
     blurb: "Plant growth against sunlight and water. The two predictors interact.",
     lesson: "Clues team up",
@@ -188,6 +193,7 @@ export const BUNDLED: BundledDataset[] = [
   },
   {
     id: "exam",
+    task: "classification",
     title: "Exam pass or fail",
     blurb: "Whether 300 students passed, from hours studied and hours slept. A classification problem.",
     lesson: "Predict yes or no",
@@ -216,6 +222,7 @@ export const BUNDLED: BundledDataset[] = [
   },
   {
     id: "loans",
+    task: "classification",
     title: "Loan approval",
     blurb: "Whether 400 loan applications were approved, from income and savings. The two predictors move together.",
     lesson: "Correlated predictors",
@@ -244,6 +251,7 @@ export const BUNDLED: BundledDataset[] = [
   },
   {
     id: "zone",
+    task: "classification",
     title: "Target zone",
     blurb: "Points inside or outside a circle. No straight line separates them, so the model needs squared terms.",
     lesson: "Needs a curved boundary",

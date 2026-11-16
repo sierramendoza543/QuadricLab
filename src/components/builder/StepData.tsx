@@ -41,22 +41,36 @@ export default function StepData({ table, note, review, onTable, onReview }: Pro
       <h2 className="mb-2 text-2xl font-bold">1. Choose a dataset</h2>
       <p className="mb-4 text-[17px]">Select a sample dataset, or upload a CSV file. Text columns such as yes/no or region are converted to 0/1 indicator columns so they can be used.</p>
 
-      <div className="divide-y divide-gray-300 border border-gray-300">
-        {BUNDLED.map((d) => (
-          <label key={d.id} className="flex cursor-pointer items-start gap-3 p-3 hover:bg-gray-50">
-            <input type="radio" name="dataset" className="mt-1.5" checked={table?.name === d.title} onChange={() => { onReview(null); onTable(d.build(), null); }} />
-            <span>
-              <span className="block font-bold">{d.title}</span>
-              <span className="block text-gray-700">{d.blurb}</span>
-              <span className="block text-sm text-gray-500">{d.size}</span>
-            </span>
-          </label>
+      <div className="grid gap-5 md:grid-cols-2">
+        {(
+          [
+            ["regression", "Regression", "Predict a number"],
+            ["classification", "Classification", "Predict a yes or no"],
+          ] as const
+        ).map(([task, title, sub]) => (
+          <div key={task}>
+            <h3 className="font-bold">{title}</h3>
+            <p className="mb-1 text-[15px] text-gray-600">{sub}</p>
+            <div className="divide-y divide-gray-300 border border-gray-300">
+              {BUNDLED.filter((d) => d.task === task).map((d) => (
+                <label key={d.id} className="flex cursor-pointer items-start gap-3 p-3 hover:bg-gray-50">
+                  <input type="radio" name="dataset" className="mt-1.5" checked={table?.name === d.title} onChange={() => { onReview(null); onTable(d.build(), null); }} />
+                  <span>
+                    <span className="block font-bold">{d.title}</span>
+                    <span className="block text-gray-700">{d.blurb}</span>
+                    <span className="block text-sm text-gray-500">{d.size}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
         ))}
-        <label className="flex items-center gap-3 p-3">
-          <span className="font-bold">Upload CSV</span>
-          <input type="file" accept=".csv,.tsv,.txt" onChange={(e) => readFile(e.target.files?.[0])} />
-        </label>
       </div>
+      <label className="mt-4 flex items-center gap-3 border border-gray-300 p-3">
+        <span className="font-bold">Upload CSV</span>
+        <input type="file" accept=".csv,.tsv,.txt" onChange={(e) => readFile(e.target.files?.[0])} />
+        <span className="text-[15px] text-gray-600">A response column with two values is treated as classification.</span>
+      </label>
 
       {error && <p className="mt-3 text-red-700">{error}</p>}
       {table && !error && (

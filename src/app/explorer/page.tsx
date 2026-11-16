@@ -41,6 +41,7 @@ const primary = "border border-blue-800 bg-blue-700 px-4 py-1.5 font-bold text-w
 
 export default function ExplorerPage() {
   const [kind, setKind] = useState<Kind | null>(null);
+  const [preview, setPreview] = useState<Kind | null>(null);
   const [step, setStep] = useState(0);
   const [reached, setReached] = useState(0);
   const scroller = useRef<HTMLDivElement>(null);
@@ -145,6 +146,12 @@ export default function ExplorerPage() {
     [tmode, tk]
   );
 
+  const pv = useMemo(() => {
+    if (!preview) return null;
+    const m = buildModel(STORIES[preview].params);
+    return { model: m, zScale: zScaleFor(m) };
+  }, [preview]);
+
   let body: React.ReactNode = null;
 
   if (step === 0 || !story || !model || !std) {
@@ -154,18 +161,40 @@ export default function ExplorerPage() {
         <p className="mb-5 text-[17px] leading-relaxed">
           Each of these four surfaces from Stewart §12.6 shows up as the loss surface of a real machine learning problem. Pick one to see how its equation is built, what a point and a trace mean for a model, and how training moves across it.
         </p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {KINDS.map((k) => (
-            <button key={k} onClick={() => chooseKind(k)} className="border border-gray-300 bg-white p-4 text-left hover:border-blue-700 hover:bg-blue-50">
-              <div className="text-lg font-bold">{STORIES[k].name}</div>
-              <div className="my-1 overflow-x-auto text-[17px]">
-                <Tex tex={STORIES[k].stewart} />
-              </div>
-              <div className="text-[15px] text-gray-700">
-                <b>Machine learning example:</b> {STORIES[k].scenario}. {STORIES[k].oneLine}
-              </div>
-            </button>
-          ))}
+        <div className="grid gap-5 lg:grid-cols-[1fr_1.1fr]">
+          <div className="space-y-3">
+            {KINDS.map((k) => (
+              <button
+                key={k}
+                onClick={() => setPreview(k)}
+                className={`block w-full border p-4 text-left hover:border-blue-700 hover:bg-blue-50 ${preview === k ? "border-blue-700 bg-blue-50" : "border-gray-300 bg-white"}`}
+              >
+                <div className="text-lg font-bold">{STORIES[k].name}</div>
+                <div className="my-1 overflow-x-auto text-[17px]">
+                  <Tex tex={STORIES[k].stewart} />
+                </div>
+                <div className="text-[15px] text-gray-700">
+                  <b>Machine learning example:</b> {STORIES[k].scenario}. {STORIES[k].oneLine}
+                </div>
+              </button>
+            ))}
+          </div>
+          <div>
+            {pv ? (
+              <>
+                <div className="mb-2 flex flex-wrap items-center gap-3">
+                  <button className={primary} onClick={() => chooseKind(preview!)}>
+                    Explore the {STORIES[preview!].name.toLowerCase()}
+                  </button>
+                  <span className="text-[15px] text-gray-600">{STORIES[preview!].scenario}: {STORIES[preview!].oneLine}</span>
+                </div>
+                <QuadricCanvas className="h-[360px] border border-gray-300" model={pv.model} zScale={pv.zScale} agents={[]} focusId="gd" vectors={NO_VECTORS} slices={{ x: { on: false, k: 0 }, y: { on: false, k: 0 }, z: { on: false, k: 0 } }} onPick={() => {}} />
+                <p className="mt-1 text-sm text-gray-500">Drag to rotate, scroll to zoom.</p>
+              </>
+            ) : (
+              <div className="flex h-[420px] items-center justify-center border border-dashed border-gray-300 text-gray-500">Select a surface to preview it here.</div>
+            )}
+          </div>
         </div>
       </div>
     );
