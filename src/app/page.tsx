@@ -137,6 +137,9 @@ export default function Page() {
             <span className="hidden sm:inline">Quadric explorer</span>
             <span className="sm:hidden">Explorer</span>
           </Link>
+          <a href="https://github.com/sierramendoza543/QuadricLab" target="_blank" rel="noopener noreferrer" className="border border-gray-300 px-3 py-1.5 hover:bg-gray-100">
+            GitHub
+          </a>
           <button
             onClick={() => setRightOpen((v) => !v)}
             aria-label="Toggle telemetry"

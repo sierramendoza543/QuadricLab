@@ -683,9 +683,12 @@ export default function ExplorerPage() {
               <span className="text-xl font-bold">Quadric Explorer</span>
               <span className="ml-3 text-gray-500">{kind ? KIND_LABEL[kind] : "how each Chapter 12 surface appears in machine learning"}</span>
             </div>
-            <Link href="/" className="text-blue-700 underline">
-              Quadric Lab
-            </Link>
+            <span className="flex gap-4">
+              <Link href="/" className="text-blue-700 underline">
+                Quadric Lab
+              </Link>
+              <a href="https://github.com/sierramendoza543/QuadricLab" target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">GitHub</a>
+            </span>
           </div>
           <nav className="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-6 pt-3 text-[15px]">
             {STEPS.map((s, i) => {
