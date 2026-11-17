@@ -39,8 +39,15 @@ export default function StepData({ table, note, review, onTable, onReview }: Pro
   return (
     <div>
       <h2 className="mb-2 text-2xl font-bold">1. Choose a dataset</h2>
-      <p className="mb-4 text-[17px]">Select a sample dataset, or upload a CSV file. Text columns such as yes/no or region are converted to 0/1 indicator columns so they can be used.</p>
+      <p className="mb-4 text-[17px]">Upload a CSV file, or select a sample dataset. Text columns such as yes/no or region are converted to 0/1 indicator columns so they can be used.</p>
 
+      <label className="mb-5 flex flex-wrap items-center gap-3 border border-gray-300 p-3">
+        <span className="font-bold">Upload CSV</span>
+        <input type="file" accept=".csv,.tsv,.txt" onChange={(e) => readFile(e.target.files?.[0])} />
+        <span className="text-[15px] text-gray-600">A response column with two values is treated as classification.</span>
+      </label>
+
+      <h3 className="mb-2 text-lg font-bold">Or choose a sample dataset</h3>
       <div className="grid gap-5 md:grid-cols-2">
         {(
           [
@@ -66,11 +73,6 @@ export default function StepData({ table, note, review, onTable, onReview }: Pro
           </div>
         ))}
       </div>
-      <label className="mt-4 flex items-center gap-3 border border-gray-300 p-3">
-        <span className="font-bold">Upload CSV</span>
-        <input type="file" accept=".csv,.tsv,.txt" onChange={(e) => readFile(e.target.files?.[0])} />
-        <span className="text-[15px] text-gray-600">A response column with two values is treated as classification.</span>
-      </label>
 
       {error && <p className="mt-3 text-red-700">{error}</p>}
       {table && !error && (
