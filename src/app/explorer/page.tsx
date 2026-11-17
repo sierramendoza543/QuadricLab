@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { Github } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import LossChart from "@/components/builder/LossChart";
 import Paper from "@/components/builder/Paper";
@@ -666,7 +667,7 @@ export default function ExplorerPage() {
           <button className={primary} onClick={() => { setKind(null); setStep(0); setReached(0); }}>
             Explore another surface
           </button>
-          <Link href="/" className={btn}>
+          <Link href="/lab" className={btn}>
             Back to Quadric Lab
           </Link>
         </div>
@@ -687,7 +688,10 @@ export default function ExplorerPage() {
               <Link href="/" className="text-blue-700 underline">
                 Quadric Lab
               </Link>
-              <a href="https://github.com/sierramendoza543/QuadricLab" target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">GitHub</a>
+              <a href="https://github.com/sierramendoza543/QuadricLab" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-700 underline">
+  <Github size={15} />
+  GitHub
+</a>
             </span>
           </div>
           <nav className="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-6 pt-3 text-[15px]">

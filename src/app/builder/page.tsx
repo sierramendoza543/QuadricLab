@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Github } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import StepData from "@/components/builder/StepData";
 import StepVariables from "@/components/builder/StepVariables";
@@ -171,7 +172,10 @@ export default function BuilderPage() {
             <Link href="/" className="text-blue-700 underline">
               Quadric Lab
             </Link>
-            <a href="https://github.com/sierramendoza543/QuadricLab" target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">GitHub</a>
+            <a href="https://github.com/sierramendoza543/QuadricLab" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-700 underline">
+  <Github size={15} />
+  GitHub
+</a>
           </span>
         </div>
         <nav className="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-6 pt-3 text-[15px]">
